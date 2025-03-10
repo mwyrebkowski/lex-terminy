@@ -84,6 +84,8 @@ Instructional terms typically:
 
 Also evaluate if the deadline could be converted to a binding one with automatic approval ("milcząca zgoda") if the deadline is missed. For example, in Prawo budowlane, if the 60-day instructional deadline for building permits became binding, an automatic permit would be granted if officials don't respond in 60 days.
 
+Additionally, identify the specific article reference (e.g., "Art. 123", "§ 5", "ust. 2 pkt 3") that contains this passage, based on the context provided.
+
 Provide your analysis in JSON format. Output the analysis in Polish language:
 {
   "search_term": "term that triggered the search",
@@ -91,6 +93,7 @@ Provide your analysis in JSON format. Output the analysis in Polish language:
   "subject": "Who the term applies to - authority or individual",
   "reasoning": "Brief explanation of your classification",
   "confidence": "High/Medium/Low",
+  "article_reference": "The specific article number (Art. X) that contains this provision",
   "binding_conversion": {
     "feasible": true/false,
     "rationale": "Why conversion would/wouldn't make sense",
@@ -170,6 +173,7 @@ def analyze_passage_with_perplexity(passage):
             search_term = passage["match_data"].get("search_term", "")
             article = passage["match_data"].get("article", "")
             context = passage["match_data"].get("full_context", "")
+            article_context = passage["match_data"].get("article_context", "")
             source = passage["match_data"].get("source", "Unknown")
             
             # Get document metadata
@@ -188,6 +192,7 @@ def analyze_passage_with_perplexity(passage):
             search_term = passage.get("search_term", "")
             article = passage.get("article", "")
             context = passage.get("full_context", "")
+            article_context = passage.get("article_context", "")
             source = passage.get("source", "Unknown")
             
             nro = passage.get("nro", "")
@@ -199,9 +204,9 @@ def analyze_passage_with_perplexity(passage):
             effective_date = passage.get("effectiveDate", "")
             publisher = passage.get("publisher", "")
         
-        # Create prompt
+        # Create prompt with full context for article identification
         prompt = get_condensed_prompt()
-        full_prompt = f"{prompt}\n\nPassage to analyze (from {source}):\n{passage_text}"
+        full_prompt = f"{prompt}\n\nPassage to analyze (from {source}):\n{passage_text}\n\nFull context:\n{article_context}\n\nCurrent article reference (if known): {article}"
         
         # Create OpenAI client with the correct base_url for Perplexity
         client = OpenAI(
@@ -263,6 +268,16 @@ def analyze_passage_with_perplexity(passage):
             # Try to parse the JSON
             analysis_result = json.loads(json_str)
             
+            # Get the AI-determined article reference if available
+            ai_article_reference = analysis_result.get("article_reference", "")
+            
+            # Use AI-determined article reference if it exists and looks valid
+            # Otherwise fall back to the original article reference
+            if ai_article_reference and ai_article_reference not in ["Not identified", "Unknown", "None"]:
+                article_to_use = ai_article_reference
+            else:
+                article_to_use = article
+            
             # Add the passage data to the analysis result
             analysis_result["nro"] = nro
             analysis_result["title"] = title
@@ -273,9 +288,10 @@ def analyze_passage_with_perplexity(passage):
             analysis_result["effective_date"] = effective_date
             analysis_result["publisher"] = publisher
             analysis_result["passage"] = passage_text
-            analysis_result["article"] = article
+            analysis_result["article"] = article_to_use  # Use AI-determined article reference when available
+            analysis_result["original_article"] = article  # Keep the original reference for reference
             analysis_result["full_context"] = context
-            analysis_result["article_context"] = article # Use article as article_context for now
+            analysis_result["article_context"] = article_context
             analysis_result["source"] = source
             
             return {"analysis_result": analysis_result, "raw_response": raw_response}

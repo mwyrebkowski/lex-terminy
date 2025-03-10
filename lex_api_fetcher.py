@@ -409,6 +409,12 @@ def extract_relevant_passages(content, search_phrase):
         sentence_end = find_sentence_end(text, end_pos)
         full_context = text[sentence_start:sentence_end].strip()
         
+        # Extract a larger article context window - 250 chars before and after the passage start
+        larger_context_window = 250
+        larger_context_start = max(0, passage_start - larger_context_window)
+        larger_context_end = min(len(text), passage_end + larger_context_window)
+        larger_passage_context = text[larger_context_start:larger_context_end].strip()
+        
         # Extract the full article context with additional article information
         article_text, article_info = extract_article_context(text, start_pos)
         
@@ -424,13 +430,14 @@ def extract_relevant_passages(content, search_phrase):
             "article_reference": article_info["current_article_reference"] or extract_article_reference(article_text),
             "position_in_doc": start_pos,
             "previous_article": article_info["previous_article_reference"],
-            "next_article": article_info["next_article_reference"]
+            "next_article": article_info["next_article_reference"],
+            "larger_context": larger_passage_context  # Add the larger context
         }
         
         passages.append(passage)
         full_contexts.append(full_context)
         structured_contexts.append(structured_context)
-        article_contexts.append(article_text)
+        article_contexts.append(larger_passage_context)  # Use larger context instead of article_text
         debug_contexts.append(debug_context)
     
     return passages, full_contexts, structured_contexts, article_contexts, debug_contexts
